@@ -1,0 +1,117 @@
+# Advanced Knowledge Simulation Platform - Backend Dependencies
+# Enterprise-grade packages for sophisticated multi-engine architecture
+
+# Core FastAPI and ASGI
+fastapi>=0.104.1
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+
+# Database and Storage
+aiosqlite>=0.19.0
+sqlalchemy>=2.0.23
+alembic>=1.12.1
+
+# Security and Cryptography
+cryptography>=41.0.7
+python-jose[cryptography]>=3.3.0
+passlib[bcrypt]>=1.7.4
+python-multipart>=0.0.6
+
+# Machine Learning and AI
+scikit-learn>=1.3.2
+numpy>=1.24.3
+pandas>=2.0.3
+scipy>=1.11.4
+
+# Advanced Analytics and ML
+matplotlib>=3.7.2
+seaborn>=0.12.2
+plotly>=5.17.0
+
+# Async Processing and Concurrency
+asyncio
+aiofiles>=23.2.1
+asyncpg>=0.29.0
+
+# Data Validation and Serialization
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# Logging and Monitoring
+structlog>=23.2.0
+loguru>=0.7.2
+
+# HTTP and Web
+httpx>=0.25.2
+requests>=2.31.0
+
+# Development and Testing
+pytest>=7.4.3
+pytest-asyncio>=0.21.1
+pytest-cov>=4.1.0
+black>=23.11.0
+isort>=5.12.0
+mypy>=1.7.1
+
+# Configuration Management
+python-dotenv>=1.0.0
+pyyaml>=6.0.1
+
+# Background Tasks and Scheduling
+celery>=5.3.4
+redis>=5.0.1
+
+# API Documentation
+pydantic[email]>=2.5.0
+python-jose>=3.3.0
+
+# Performance Optimization
+orjson>=3.9.10
+cachetools>=5.3.2
+
+# Networking and CORS
+starlette>=0.27.0
+
+# Date and Time Utilities
+python-dateutil>=2.8.2
+
+# Mathematical Operations
+sympy>=1.12
+
+# Knowledge Graph and Graph Analytics
+networkx>=3.2.1
+igraph>=0.11.2
+
+# Natural Language Processing (for advanced text analysis)
+spacy>=3.7.2
+transformers>=4.35.2
+torch>=2.1.1
+
+# Data Processing and Analysis
+openpyxl>=3.1.2
+xlsxwriter>=3.1.9
+
+# Memory Profiling and Optimization
+psutil>=5.9.6
+memory-profiler>=0.61.0
+
+# Dependency Injection
+dependency-injector>=4.41.0
+
+# Advanced Caching
+aiocache[redis]>=0.12.2
+
+# Metrics and Observability
+prometheus-client>=0.19.0
+jaeger-client>=4.8.0
+
+# Enterprise Integration
+kafka-python>=2.0.2
+celery[redis]>=5.3.4
+
+# Advanced Configuration
+hydra-core>=1.3.2
+omegaconf>=2.3.0
+
+# Google Gemini AI Integration
+google-genai>=0.3.0 
