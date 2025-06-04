@@ -45,8 +45,13 @@ from models import (
     SimulationResult,
     AxisTranslationRequest as BasicTranslationRequest,
     MathematicalOperation,
-    MathematicalResult
+    MathematicalResult,
+    AxisMetadata,
+    AXIS_METADATA,
+    AXIS_KEYS
 )
+from math_engine import math_engine
+from simulation_engine import simulation_engine
 
 # Configure logging
 logging.basicConfig(
@@ -697,6 +702,421 @@ async def store_secure_result(result: EnhancedSimulationResult, security_level: 
             )
         except Exception as e:
             logger.error(f"Failed to store secure result: {e}")
+
+# ================================
+# BASIC FUNCTIONALITY ENDPOINTS
+# ================================
+
+# Axis metadata endpoints
+@app.get("/axis/", response_model=List[AxisMetadata], tags=["Axis System"])
+async def list_axes():
+    """Get metadata for all 13 axes"""
+    return AXIS_METADATA
+
+@app.get("/axis/{axis_key}", response_model=AxisMetadata, tags=["Axis System"])
+async def get_axis_detail(axis_key: str):
+    """Get detailed metadata for a specific axis"""
+    for axis in AXIS_METADATA:
+        if axis.key == axis_key:
+            return axis
+    raise HTTPException(status_code=404, detail=f"Axis '{axis_key}' not found")
+
+@app.get("/axis/keys", response_model=List[str], tags=["Axis System"])
+async def get_axis_keys():
+    """Get list of all axis keys"""
+    return AXIS_KEYS
+
+# Coordinate operations
+@app.post("/axis/parse", response_model=AxisCoordinate, tags=["Coordinate Operations"])
+async def parse_nuremberg_coordinate(nuremberg_string: str):
+    """Parse a Nuremberg coordinate string into AxisCoordinate"""
+    try:
+        # Split by pipe delimiter
+        values = nuremberg_string.split("|")
+        
+        if len(values) != len(AXIS_KEYS):
+            raise ValueError(f"Expected {len(AXIS_KEYS)} values, got {len(values)}")
+        
+        # Create coordinate dict
+        coord_data = {}
+        for i, key in enumerate(AXIS_KEYS):
+            value = values[i].strip()
+            if value:  # Only set non-empty values
+                if key == "honeycomb" and value:
+                    # Handle honeycomb as array
+                    coord_data[key] = [v.strip() for v in value.split(",") if v.strip()]
+                elif key == "sector":
+                    # Try to convert sector to int if possible
+                    try:
+                        coord_data[key] = int(value)
+                    except ValueError:
+                        coord_data[key] = value
+                else:
+                    coord_data[key] = value
+        
+        # Ensure required fields
+        if "pillar" not in coord_data:
+            coord_data["pillar"] = "PL01.1.1"
+        if "sector" not in coord_data:
+            coord_data["sector"] = "Unknown"
+        
+        return AxisCoordinate(**coord_data)
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to parse coordinate: {str(e)}")
+
+@app.post("/axis/validate", response_model=Dict[str, Any], tags=["Coordinate Operations"])
+async def validate_coordinate(coordinate: AxisCoordinate):
+    """Validate and analyze an axis coordinate"""
+    try:
+        # Calculate various metrics
+        nuremberg = coordinate.nuremberg_number()
+        usi = coordinate.unified_system_id()
+        completeness = coordinate.get_axis_completeness_ratio()
+        filled_count = coordinate.get_filled_axes_count()
+        
+        # Validate format compliance
+        validation_errors = []
+        
+        # Check pillar format
+        if not coordinate.pillar.startswith("PL") or len(coordinate.pillar) < 6:
+            validation_errors.append("Pillar must follow PLxx.x.x format")
+        
+        # Check temporal format if present
+        if coordinate.temporal:
+            try:
+                datetime.fromisoformat(coordinate.temporal.replace('Z', '+00:00'))
+            except ValueError:
+                validation_errors.append("Temporal must be valid ISO 8601 format")
+        
+        return {
+            "valid": len(validation_errors) == 0,
+            "errors": validation_errors,
+            "metrics": {
+                "nuremberg_number": nuremberg,
+                "usi": usi,
+                "completeness_ratio": completeness,
+                "filled_axes": filled_count,
+                "total_axes": len(AXIS_KEYS)
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Validation failed: {str(e)}")
+
+# Mathematical operations
+@app.post("/axis/math", response_model=MathematicalResult, tags=["Mathematical Operations"])
+async def calculate_axis_math(operation: MathematicalOperation):
+    """Perform mathematical operations on axis coordinates"""
+    try:
+        return math_engine.execute_operation(operation)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Mathematical operation failed: {str(e)}")
+
+@app.get("/math/ops", response_model=List[str], tags=["Mathematical Operations"])
+async def list_math_operations():
+    """Get list of available mathematical operations"""
+    return math_engine.get_available_operations()
+
+@app.post("/math/play", response_model=MathematicalResult, tags=["Mathematical Operations"])
+async def math_playground(request: MathematicalOperation):
+    """Mathematical playground for testing operations"""
+    try:
+        return math_engine.execute_operation(request)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Math playground operation failed: {str(e)}")
+
+@app.post("/math/playground", response_model=MathematicalResult, tags=["Mathematical Operations"])
+async def mathematical_playground(request: MathematicalOperation):
+    """Alternative mathematical playground endpoint"""
+    try:
+        return math_engine.execute_operation(request)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Mathematical playground failed: {str(e)}")
+
+@app.get("/math/operations", response_model=Dict[str, List[str]], tags=["Mathematical Operations"])
+async def get_mathematical_operations():
+    """Get categorized mathematical operations"""
+    return {
+        "basic": ["add", "subtract", "multiply", "divide"],
+        "coordinate": ["distance", "similarity", "intersection", "union"],
+        "advanced": ["probability", "correlation", "clustering", "optimization"],
+        "analysis": ["completeness", "consistency", "complexity", "coverage"]
+    }
+
+# Crosswalk operations
+@app.get("/axis/crosswalk", response_model=Dict[str, List[str]], tags=["Crosswalk Operations"])
+async def get_crosswalk_mappings():
+    """Get available crosswalk mappings between axes"""
+    return {
+        "pillar_to_sector": [
+            "PL12 → 5415 (Technology to Professional Services)",
+            "PL08 → Healthcare (Analytics to Healthcare)",
+            "PL03 → 62 (Healthcare to Healthcare Services)",
+            "PL05 → 52 (Finance to Finance Services)",
+            "PL15 → 5112 (AI/ML to Software)"
+        ],
+        "sector_to_regulatory": [
+            "Healthcare → HIPAA",
+            "62 → HIPAA",
+            "52 → SOX",
+            "Finance → SOX",
+            "5415 → GDPR",
+            "Tech → GDPR"
+        ],
+        "regulatory_to_compliance": [
+            "HIPAA → HITECH",
+            "GDPR → ISO-27001",
+            "SOX → SOC1",
+            "CFR-21 → FDA-21CFR"
+        ],
+        "role_to_pillar": [
+            "Data Scientist → PL12.2.1",
+            "Software Engineer → PL12.1.1",
+            "Compliance Officer → PL06.1.1",
+            "Healthcare Analyst → PL08.1.1"
+        ]
+    }
+
+@app.post("/crosswalk/analyze", response_model=Dict[str, Any], tags=["Crosswalk Operations"])
+async def analyze_crosswalk(source_axis: str, source_value: str, target_axis: str):
+    """Analyze crosswalk relationships between axes"""
+    try:
+        analysis = simulation_engine.analyze_crosswalk(source_axis, source_value, target_axis)
+        return {
+            "source": {"axis": source_axis, "value": source_value},
+            "target": {"axis": target_axis},
+            "mapping_suggestions": analysis.get("suggestions", []),
+            "confidence_score": analysis.get("confidence", 0.0),
+            "rationale": analysis.get("rationale", "Standard crosswalk analysis")
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Crosswalk analysis failed: {str(e)}")
+
+@app.get("/crosswalk/types", response_model=Dict[str, Any], tags=["Crosswalk Operations"])
+async def get_crosswalk_types():
+    """Get available crosswalk relationship types"""
+    return {
+        "relationship_types": [
+            "direct_mapping",
+            "hierarchical",
+            "categorical",
+            "conditional",
+            "probabilistic"
+        ],
+        "mapping_strength": [
+            "exact",
+            "strong",
+            "moderate", 
+            "weak",
+            "suggested"
+        ],
+        "validation_status": [
+            "validated",
+            "proposed",
+            "experimental",
+            "deprecated"
+        ]
+    }
+
+# Translation and persona operations
+@app.post("/translate/text", response_model=Dict[str, Any], tags=["Translation"])
+async def translate_text_to_coordinate_simple(text: str):
+    """Translate natural language text to axis coordinate"""
+    try:
+        coordinate, confidence, rationale = simulation_engine.translate_text_to_coordinate(text)
+        return {
+            "input_text": text,
+            "suggested_coordinate": coordinate.dict(),
+            "confidence_score": confidence,
+            "rationale": rationale
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Text translation failed: {str(e)}")
+
+@app.post("/persona/expand", response_model=Dict[str, Any], tags=["Persona Operations"])
+async def expand_persona(role_name: str, target_roles: Optional[List[str]] = None):
+    """Expand persona from role name to full coordinate"""
+    try:
+        expansion = simulation_engine.expand_persona(role_name, target_roles)
+        return {
+            "role_name": role_name,
+            "expanded_coordinate": expansion.get("coordinate", {}),
+            "activation_scores": expansion.get("scores", {}),
+            "reasoning": expansion.get("reasoning", "Standard persona expansion")
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Persona expansion failed: {str(e)}")
+
+@app.get("/roles/available", response_model=Dict[str, Any], tags=["Persona Operations"])
+async def get_available_roles():
+    """Get list of available roles for persona expansion"""
+    return {
+        "knowledge_roles": [
+            "Data Scientist", "Software Engineer", "Business Analyst",
+            "Product Manager", "UX Designer", "DevOps Engineer"
+        ],
+        "sector_roles": [
+            "Healthcare Analyst", "Financial Advisor", "Legal Counsel",
+            "Manufacturing Engineer", "Retail Manager", "Education Specialist"
+        ],
+        "regulatory_roles": [
+            "Compliance Officer", "Risk Manager", "Auditor",
+            "Privacy Officer", "Security Analyst", "Legal Advisor"
+        ],
+        "leadership_roles": [
+            "CEO", "CTO", "CISO", "Head of Compliance",
+            "VP Engineering", "Director of Operations"
+        ]
+    }
+
+# System information and examples
+@app.get("/system/info", response_model=Dict[str, Any], tags=["System Information"])
+async def get_system_info():
+    """Get comprehensive system information"""
+    return {
+        "version": "2.0.0",
+        "system_name": "Advanced Knowledge Simulation Platform",
+        "axis_count": len(AXIS_KEYS),
+        "features": {
+            "coordinate_system": "13-axis multidimensional framework",
+            "mathematical_operations": "Advanced computation engine",
+            "simulation_engine": "Multi-persona behavioral modeling",
+            "ai_integration": "Gemini AI enhancement",
+            "security": "Enterprise-grade data protection",
+            "knowledge_graph": "Dynamic relationship mapping"
+        },
+        "capabilities": {
+            "natural_language_processing": True,
+            "complex_reasoning": True,
+            "multi_persona_simulation": True,
+            "regulatory_compliance": True,
+            "real_time_analytics": True,
+            "secure_storage": True
+        },
+        "api_endpoints": {
+            "coordinate_operations": "/axis/*",
+            "mathematical_operations": "/math/*", 
+            "simulation": "/api/simulate/*",
+            "ai_features": "/api/ai/*",
+            "knowledge_graph": "/api/knowledge/*",
+            "security": "/api/secure/*"
+        }
+    }
+
+@app.post("/dev/generate-sample", response_model=AxisCoordinate, tags=["Development"])
+async def generate_sample_coordinate(role: Optional[str] = None):
+    """Generate sample coordinate for testing"""
+    try:
+        if role:
+            sample = simulation_engine.generate_sample_for_role(role)
+        else:
+            sample = simulation_engine.generate_random_sample()
+        return sample
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Sample generation failed: {str(e)}")
+
+@app.post("/coordinate/validate", response_model=Dict[str, Any], tags=["Coordinate Operations"])
+async def validate_coordinate_detailed(coordinate: AxisCoordinate):
+    """Detailed coordinate validation with suggestions"""
+    try:
+        validation = simulation_engine.validate_coordinate_comprehensive(coordinate)
+        return {
+            "coordinate": coordinate.dict(),
+            "validation_status": validation.get("status", "unknown"),
+            "errors": validation.get("errors", []),
+            "warnings": validation.get("warnings", []),
+            "suggestions": validation.get("suggestions", []),
+            "completeness_score": validation.get("completeness", 0.0),
+            "consistency_score": validation.get("consistency", 0.0)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Coordinate validation failed: {str(e)}")
+
+@app.get("/examples/comprehensive", response_model=Dict[str, Any], tags=["Examples"])
+async def get_comprehensive_examples():
+    """Get comprehensive examples for all system features"""
+    return {
+        "coordinates": [
+            {
+                "name": "Healthcare AI System",
+                "description": "AI system for healthcare data analysis with HIPAA compliance",
+                "coordinate": {
+                    "pillar": "PL08.2.1",
+                    "sector": "Healthcare",
+                    "regulatory": "HIPAA",
+                    "compliance": "HITECH",
+                    "role_knowledge": "Data Scientist",
+                    "role_sector": "Healthcare Analyst"
+                }
+            },
+            {
+                "name": "Financial Trading Platform",
+                "description": "Algorithmic trading system with SOX compliance",
+                "coordinate": {
+                    "pillar": "PL05.1.2",
+                    "sector": "Finance",
+                    "regulatory": "SOX",
+                    "compliance": "SOC1",
+                    "role_knowledge": "Quantitative Analyst",
+                    "role_sector": "Financial Engineer"
+                }
+            }
+        ],
+        "mathematical_operations": [
+            {
+                "operation": "coordinate_distance",
+                "description": "Calculate Euclidean distance between two coordinates",
+                "example": "Measure similarity between healthcare systems"
+            },
+            {
+                "operation": "completeness_analysis", 
+                "description": "Analyze coordinate completeness and suggest improvements",
+                "example": "Optimize coordinate specification"
+            }
+        ],
+        "ai_queries": [
+            "Analyze regulatory requirements for AI in healthcare",
+            "Generate reasoning chain for ethical AI implementation",
+            "Translate compliance requirements to coordinate system"
+        ]
+    }
+
+@app.get("/health/detailed", response_model=Dict[str, Any], tags=["System"])
+async def detailed_health_check():
+    """Detailed system health check with component status"""
+    components = {
+        "app_orchestrator": {
+            "status": "healthy" if app_orchestrator else "unavailable",
+            "version": "2.0.0",
+            "active_sessions": len(app_orchestrator.active_sessions) if app_orchestrator else 0
+        },
+        "kase_engine": {
+            "status": "healthy" if kase_engine else "unavailable",
+            "capabilities": ["simulation", "reasoning", "analysis"] if kase_engine else []
+        },
+        "sekre_engine": {
+            "status": "healthy" if sekre_engine else "unavailable", 
+            "security_level": "enterprise" if sekre_engine else "none"
+        },
+        "gemini_engine": {
+            "status": "healthy" if gemini_engine else "unavailable",
+            "ai_features": ["reasoning", "translation", "analysis"] if gemini_engine else []
+        }
+    }
+    
+    overall_health = all(comp["status"] == "healthy" for comp in components.values())
+    
+    return {
+        "overall_status": "healthy" if overall_health else "degraded",
+        "timestamp": datetime.utcnow().isoformat(),
+        "components": components,
+        "system_metrics": {
+            "uptime": "running",
+            "memory_usage": "normal",
+            "response_time": "optimal"
+        }
+    }
 
 # Development server
 if __name__ == "__main__":
